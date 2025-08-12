@@ -1,13 +1,11 @@
 from typing import List, Dict, Tuple
 from datetime import time
 
-# ========================
-# Helpers de tiempo
-# ========================
+# ===== Helpers de tiempo =====
 def _to_minutes(hhmm: str) -> int:
     h, m = map(int, hhmm.split(":"))
     if h == 24 and m == 0:
-        return 24*60 - 1  # 23:59 como tope del día
+        return 24*60 - 1
     return h*60 + m
 
 def _slot_dur_minutes(start: str, end: str) -> int:
@@ -22,15 +20,9 @@ def _parse_time(hhmm: str) -> time:
 def _slot_hours(start: str, end: str) -> float:
     return _slot_dur_minutes(start, end) / 60.0
 
-# ========================
-# Greedy v1 (simple)
-# ========================
-def greedy_assign(
-    slots: List[Dict[str, str]],       # [{"start":"HH:MM","end":"HH:MM"}...]
-    min_per_slot: List[int],           # misma longitud que slots
-    employees: List[Dict[str, float]], # [{"id":"E1","target_hours":40.0}...]
-    tolerance: float = 2.0
-):
+# ===== Greedy v1 (simple) =====
+def greedy_assign(slots: List[Dict[str, str]], min_per_slot: List[int],
+                  employees: List[Dict[str, float]], tolerance: float = 2.0):
     dur = [_slot_hours(s["start"], s["end"]) for s in slots]
     hours_assigned = {e["id"]: 0.0 for e in employees}
     assignments: List[List[str]] = [[] for _ in slots]
@@ -38,7 +30,6 @@ def greedy_assign(
     for i, need in enumerate(min_per_slot):
         attempts = 0
         while len(assignments[i]) < need and attempts < 1000:
-            # ordenar por horas restantes (objetivo - asignadas), desc
             candidates = sorted(
                 employees,
                 key=lambda e: (e["target_hours"] - hours_assigned[e["id"]]),
@@ -47,12 +38,10 @@ def greedy_assign(
             picked = None
             for c in candidates:
                 remaining = c["target_hours"] - hours_assigned[c["id"]]
-                # permitimos pasarnos hasta 'tolerance' horas
                 if remaining + tolerance >= dur[i]:
                     picked = c
                     break
             if picked is None:
-                # si nadie tiene margen, elige el que menos se pasa
                 picked = max(
                     employees,
                     key=lambda e: (e["target_hours"] - hours_assigned[e["id"]])
@@ -60,24 +49,37 @@ def greedy_assign(
             assignments[i].append(picked["id"])
             hours_assigned[picked["id"]] += dur[i]
             attempts += 1
-
     return assignments, hours_assigned
 
-# ========================
-# Helpers Greedy v2
-# ========================
+# ===== Helpers v2 =====
+def _merge_contiguous(intervals: List[Dict[str, str]]) -> List[Tuple[int, int]]:
+    """Une intervalos contiguos (end == next start). Devuelve en minutos."""
+    if not intervals: return []
+    ivals = sorted([( _to_minutes(x["start"]), _to_minutes(x["end"]) ) for x in intervals])
+    merged = [ivals[0]]
+    for s,e in ivals[1:]:
+        ps,pe = merged[-1]
+        if pe == s:  # contiguo → mismo bloque
+            merged[-1] = (ps, e)
+        elif e <= pe:  # contenido
+            continue
+        else:
+            merged.append((s,e))
+    return merged
+
 def _blocks_count(intervals: List[Dict[str, str]]) -> int:
-    """Cuenta bloques (segmentos no contiguos) en una lista de intervalos del mismo día."""
-    if not intervals:
-        return 0
-    ivals = sorted(intervals, key=lambda s: _to_minutes(s["start"]))
-    blocks = 1
-    for i in range(1, len(ivals)):
-        prev_end = _to_minutes(ivals[i-1]["end"])
-        cur_start = _to_minutes(ivals[i]["start"])
-        if prev_end != cur_start:
-            blocks += 1
-    return blocks
+    return len(_merge_contiguous(intervals))
+
+def _gap_ok(intervals: List[Dict[str, str]], min_rest_h: float) -> bool:
+    """Si hay >1 bloque, todos los huecos entre bloques deben ser >= min_rest."""
+    merged = _merge_contiguous(intervals)
+    if len(merged) <= 1: return True
+    min_rest_min = int(min_rest_h * 60)
+    for i in range(1, len(merged)):
+        gap = merged[i][0] - merged[i-1][1]
+        if gap < min_rest_min:
+            return False
+    return True
 
 def _is_available(emp: Dict, day: str, start: str, end: str) -> bool:
     av = emp.get("availability", {})
@@ -90,24 +92,21 @@ def _is_available(emp: Dict, day: str, start: str, end: str) -> bool:
             return True
     return False
 
-# ========================
-# Greedy v2 (reglas duras)
-# ========================
+# ===== Greedy v2 con reglas duras (ampliado) =====
 def greedy_assign_v2(
     slots: List[Dict[str, str]],          # [{"day","start","end"}...]
     min_per_slot: List[int],
-    employees: List[Dict],                # cada emp: id, target_hours, max_hours_per_day, max_blocks_per_day, availability
+    employees: List[Dict],                # id, target_hours, max_hours_per_day, max_blocks_per_day, min_hours_per_day, min_rest_between_blocks, availability
     tolerance: float = 2.0
 ):
     hours_assigned = {e["id"]: 0.0 for e in employees}
-    hours_per_day: Dict[Tuple[str, str], float] = {}                # (emp_id, day) -> horas
-    emp_day_intervals: Dict[Tuple[str, str], List[Dict]] = {}       # (emp_id, day) -> intervalos
+    hours_per_day: Dict[Tuple[str, str], float] = {}          # (emp_id, day) -> horas
+    emp_day_intervals: Dict[Tuple[str, str], List[Dict]] = {} # (emp_id, day) -> intervalos
     assignments: List[List[str]] = [[] for _ in slots]
     warnings: List[str] = []
 
     for i, need in enumerate(min_per_slot):
-        day = slots[i]["day"]
-        s = slots[i]["start"]; e = slots[i]["end"]
+        day = slots[i]["day"]; s = slots[i]["start"]; e = slots[i]["end"]
         dur_h = _slot_dur_minutes(s, e) / 60.0
 
         attempts = 0
@@ -115,17 +114,28 @@ def greedy_assign_v2(
             cand: List[tuple] = []
             for emp in employees:
                 eid = emp["id"]
-                if eid in assignments[i]:
-                    continue
-                if not _is_available(emp, day, s, e):
-                    continue
+                if eid in assignments[i]: continue
+                if not _is_available(emp, day, s, e): continue
+
                 current_day_hours = hours_per_day.get((eid, day), 0.0)
-                if current_day_hours + dur_h > float(emp.get("max_hours_per_day", 10.0)) + 1e-6:
+                max_day = float(emp.get("max_hours_per_day", 10.0))
+                if current_day_hours + dur_h > max_day + 1e-6:
                     continue
+
+                # bloques + descanso entre bloques
                 lst = emp_day_intervals.get((eid, day), [])
                 new_lst = lst + [{"start": s, "end": e}]
-                if _blocks_count(new_lst) > int(emp.get("max_blocks_per_day", 2)):
+                max_blocks = int(emp.get("max_blocks_per_day", 2))
+                if _blocks_count(new_lst) > max_blocks:
                     continue
+                min_rest = float(emp.get("min_rest_between_blocks", 0.0))
+                if not _gap_ok(new_lst, min_rest):
+                    continue
+
+                # Heurística leve para min horas/día:
+                # si aún no trabaja ese día y este slot es menor al mínimo, lo permitimos
+                # pero luego avisaremos si acaba el día por debajo.
+                # (Implementación estricta requeriría lookahead global.)
                 cont = 0
                 for itv in lst:
                     if itv["end"] == s or itv["start"] == e:
@@ -149,11 +159,21 @@ def greedy_assign_v2(
         if len(assignments[i]) < need:
             warnings.append(f"Déficit en {day} {s}-{e}: {len(assignments[i])}/{need}")
 
+    # Avisos por objetivo semanal ± tolerancia y por mínimos diarios
     for emp in employees:
         eid = emp["id"]
         lo = float(emp["target_hours"]) - tolerance
         hi = float(emp["target_hours"]) + tolerance
         if not (lo <= hours_assigned[eid] <= hi):
             warnings.append(f"AVISO {eid}: {hours_assigned[eid]:.1f}h vs objetivo {emp['target_hours']}±{tolerance}")
+
+    # Mínimo diario si trabajaron ese día
+    for emp in employees:
+        eid = emp["id"]
+        min_day = float(emp.get("min_hours_per_day", 0.0))
+        for day in {s["day"] for s in slots}:
+            h = hours_per_day.get((eid, day), 0.0)
+            if 1e-6 < h < min_day - 1e-6:
+                warnings.append(f"AVISO {eid} {day}: {h:.1f}h < mínimo diario {min_day}h")
 
     return assignments, hours_assigned, warnings
