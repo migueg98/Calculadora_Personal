@@ -2,7 +2,7 @@
 <html>
 <head>
 <meta charset="utf-8" />
-<title>Cuadrantes — Wizard con catálogo común</title>
+<title>Cuadrantes — Wizard compacto</title>
 <style>
 :root{--w:1100px}
 *{box-sizing:border-box}
@@ -14,104 +14,80 @@ small.help{color:#555}
 .col{display:flex;flex-direction:column;gap:6px}
 label{font-weight:600}
 select,input,button{font-size:14px;padding:8px}
-select,input{min-width:120px}
-details{border:1px solid #f1f1f1;border-radius:10px;padding:10px;margin:8px 0}
-details>summary{cursor:pointer;font-weight:700}
-.daygrid{display:grid;grid-template-columns:repeat(2,1fr);gap:10px}
-.daycard{border:1px solid #f3f3f3;border-radius:10px;padding:10px}
-.tag{display:inline-block;background:#f5f5f5;border:1px solid #eee;border-radius:999px;padding:2px 8px;margin:3px 6px 0 0}
-.badge{display:inline-block;background:#eef7ff;border:1px solid #d8ebff;border-radius:6px;padding:2px 6px;margin-left:6px;color:#175f9e}
-.list{max-height:260px;overflow:auto;border:1px solid #eee;border-radius:8px;padding:8px}
-.rowm{display:flex;align-items:center;gap:8px;margin:6px 0}
-.tramos{border:1px dashed #e6e6e6;border-radius:8px;padding:8px;margin-top:6px}
-.tramo{display:flex;gap:8px;align-items:center;margin:6px 0}
-.tramo button{padding:6px}
-.kpi{display:flex;gap:10px;flex-wrap:wrap;margin-top:6px}
-.kpi .tag{background:#f8fff5;border-color:#e1f3d8}
-.warn{background:#fff9e6;border:1px solid #ffe08a;padding:10px;white-space:pre-wrap;border-radius:8px;margin-top:10px}
-hr{border:none;border-top:1px solid #eee;margin:12px 0}
-.mono{font-family:ui-monospace,Menlo,Consolas,monospace}
-.btns{display:flex;gap:8px;flex-wrap:wrap;margin-top:8px}
+select,input{min-width:110px}
 table{border-collapse:collapse;width:100%;margin-top:16px}
 th,td{border:1px solid #e3e3e3;padding:8px;text-align:center}
 th{background:#fafafa}
+.badge{display:inline-block;background:#eef7ff;border:1px solid #d8ebff;border-radius:6px;padding:2px 6px;margin-left:6px;color:#175f9e}
+.warn{background:#fff3f3;border:1px solid #ffb5b5;padding:10px;border-radius:8px;margin-top:10px;white-space:pre-wrap}
+.ok{background:#f3fff3;border:1px solid #b8e6b8;padding:8px;border-radius:8px;margin-top:10px}
+.mono{font-family:ui-monospace,Menlo,Consolas,monospace}
+.small{width:110px}
+.nowrap{white-space:nowrap}
 </style>
 </head>
 <body>
-<h1>Cuadrantes — Configuración (sin cálculo aún)</h1>
+<h1>Cuadrantes — Configuración</h1>
 
 <!-- Paso 1: Horario del restaurante -->
 <div class="step" id="step1">
-  <h3>Paso 1 · Horario del restaurante</h3>
-  <small class="help">Define hasta <b>dos rangos</b> por día (comida y cena). Con eso generaremos un <b>catálogo de franjas común</b>.</small>
+  <h3>Paso 1 · Horario del restaurante (compacto)</h3>
+  <small class="help">Dos rangos por día (comida/cena). Granularidad fija: <b>60 min</b>.</small>
 
   <div class="row">
-    <div class="col">
-      <label>Granularidad (min)</label>
-      <select id="granularity">
-        <option value="30">30</option>
-        <option value="60" selected>60</option>
-        <option value="120">120</option>
-      </select>
-    </div>
     <div class="col">
       <label>Duración mínima de franja (h)</label>
       <select id="minSlotH">
-        <option>2</option><option selected>3</option><option>4</option>
+        <option>1</option><option selected>2</option><option>3</option><option>4</option>
+        <option>5</option><option>6</option><option>7</option><option>8</option>
       </select>
     </div>
-  </div>
-
-  <details open>
-    <summary>Horario semanal</summary>
-    <div class="daygrid" id="days"></div>
-    <div class="btns">
-      <button id="copyMonToAll">Copiar Lunes al resto</button>
-      <button id="genCatalog">Generar catálogo común de franjas</button>
-    </div>
-  </details>
-
-  <details open>
-    <summary>Catálogo de franjas (común a todos los días)</summary>
-    <div class="row">
-      <div class="btns">
-        <button id="selAll">Seleccionar todas</button>
-        <button id="selNone">Deseleccionar todas</button>
-      </div>
-      <div class="kpi">
-        <span class="tag" id="catalogCount">0 franjas</span>
-        <span class="tag" id="catalogDur">—</span>
-      </div>
-    </div>
-    <div class="list" id="catalog"></div>
-    <small class="help">Este listado es único. Luego, para cada día, solo se usarán las franjas que <i>encajen</i> en su horario.</small>
-  </details>
-</div>
-
-<!-- Paso 2: Demanda (mínimos por franja) -->
-<div class="step" id="step2">
-  <h3>Paso 2 · Demanda por día (tramos)</h3>
-  <small class="help">Define “tramos de demanda” por día. El mínimo aplicado a cada franja será el de la línea que la cubra (si se solapan, se toma el <b>máximo</b>).</small>
-  <details open>
-    <summary>Editor de tramos</summary>
-    <div id="tramosWrap"></div>
-    <div class="btns">
-      <button id="copyDemandMonToAll">Copiar demanda de Lunes al resto</button>
-      <button id="previewPerDay">Vista previa (cuántas franjas usa cada día)</button>
-    </div>
-    <div class="kpi" id="dayPreview"></div>
-  </details>
-</div>
-
-<!-- Paso 3: (placeholder) Reglas del personal / Horizonte -->
-<div class="step" id="step3">
-  <h3>Paso 3 · Reglas del personal (placeholder)</h3>
-  <small class="help">De momento solo preparamos la configuración. Cuando la UI esté ok, conectamos el cálculo.</small>
-  <div class="row">
     <div class="col">
       <label>Empleados (IDs, coma)</label>
       <input id="emps" value="E1,E2,E3,E4,E5,E6,E7,E8,E9,E10" />
     </div>
+  </div>
+
+  <table id="schedTbl">
+    <thead>
+      <tr>
+        <th>Día</th>
+        <th>R1 Inicio</th><th>R1 Fin</th>
+        <th class="nowrap">Turno partido</th>
+        <th>R2 Inicio</th><th>R2 Fin</th>
+      </tr>
+    </thead>
+    <tbody id="schedBody"></tbody>
+  </table>
+
+  <div class="row" style="justify-content:space-between;align-items:center">
+    <div class="row">
+      <button id="copyMon">Copiar Lunes al resto</button>
+    </div>
+    <div class="row">
+      <button id="genCatalog">Generar catálogo común de franjas</button>
+      <span class="badge" id="kpiCat">—</span>
+    </div>
+  </div>
+
+  <div id="catalogBox" class="ok" style="display:none"></div>
+</div>
+
+<!-- Paso 2: Demanda por tramos (opcional) -->
+<div class="step" id="step2">
+  <h3>Paso 2 · Demanda por tramos (opcional)</h3>
+  <small class="help">
+    Si no configuras nada aquí, se usará por defecto el <b>máximo personal posible (nº de empleados)</b> en cada hora del día.
+    Abre un día y ajusta mínimos por <b>tramos de 1 h</b> si lo necesitas.
+  </small>
+
+  <div id="demandWrap"></div>
+</div>
+
+<!-- Paso 3: Reglas y cálculo -->
+<div class="step" id="step3">
+  <h3>Paso 3 · Reglas del personal y cálculo</h3>
+  <div class="row">
     <div class="col">
       <label>Objetivo horas/empleado</label>
       <select id="target"><option>20</option><option>30</option><option selected>40</option><option>45</option></select>
@@ -121,8 +97,8 @@ th{background:#fafafa}
       <select id="tol"><option>0</option><option selected>2</option><option>3</option><option>4</option></select>
     </div>
     <div class="col">
-      <label>Turno partido</label>
-      <select id="allowSplit"><option value="1">No</option><option value="2" selected>Sí</option></select>
+      <label>Turno partido (bloques/día)</label>
+      <select id="allowSplit"><option value="1">No (1)</option><option value="2" selected>Sí (2)</option></select>
     </div>
     <div class="col">
       <label>Mín horas/día</label>
@@ -133,7 +109,7 @@ th{background:#fafafa}
       <select id="maxDay"><option>8</option><option selected>9</option><option>10</option></select>
     </div>
     <div class="col">
-      <label>Descanso bloques (h)</label>
+      <label>Descanso entre bloques (h)</label>
       <select id="minRest"><option>2</option><option selected>3</option><option>4</option></select>
     </div>
     <div class="col">
@@ -142,260 +118,342 @@ th{background:#fafafa}
     </div>
   </div>
 
-  <div class="btns">
-    <button id="showPayload">Ver payload (JSON)</button>
+  <div class="row">
+    <button id="run">Generar cuadrante</button>
   </div>
-  <pre class="warn" id="payloadBox" style="display:none"></pre>
+
+  <div id="impossible" class="warn" style="display:none"></div>
+  <div id="tableWrap"></div>
 </div>
 
 <script>
-/* -------- utilidades -------- */
+/* ---------- Utilidades ---------- */
 const DAYS_EN=["Mon","Tue","Wed","Thu","Fri","Sat","Sun"];
 const DAYS_ES=["Lun","Mar","Mié","Jue","Vie","Sáb","Dom"];
 function pad2(n){return String(n).padStart(2,'0')}
 function minutes(t){let [h,m]=t.split(":").map(Number); if(h===24&&m===0) return 24*60-1; return h*60+m;}
 function hoursBetween(a,b){return Math.max(0,(minutes(b)-minutes(a)))/60.0}
-function timeOptions(step){const out=[]; for(let m=0;m<=24*60;m+=step){const h=Math.floor(m/60),mm=m%60; out.push(`${pad2(h)}:${pad2(mm)}`)} return out}
-function uniq(arr){return [...new Set(arr)]}
+function timeOptions60(){const out=[]; for(let h=0;h<=24;h++){out.push(`${pad2(h)}:00`)} return out}
+function empCount(){return (document.getElementById('emps').value||'').split(',').map(x=>x.trim()).filter(Boolean).length}
 
-/* -------- Paso 1: horario diario -------- */
-function makeDayCard(idx){
-  const en=DAYS_EN[idx], es=DAYS_ES[idx];
-  const card=document.createElement('div'); card.className='daycard'; card.dataset.day=en;
-  card.innerHTML=`
-    <div style="font-weight:700">${es} <span class="mono" style="color:#777">(${en})</span></div>
-    <div class="row">
-      <div class="col"><label>Rango 1 inicio</label><select class="s1"></select></div>
-      <div class="col"><label>Rango 1 fin</label><select class="e1"></select></div>
-      <div class="col"><label>Turno partido local</label><select class="parted"><option>No</option><option selected>Sí</option></select></div>
-      <div class="col"><label>Rango 2 inicio</label><select class="s2"></select></div>
-      <div class="col"><label>Rango 2 fin</label><select class="e2"></select></div>
-    </div>
-  `;
-  fillTimeSelects(card);
-  // defaults
-  card.querySelector('.s1').value="11:00"; card.querySelector('.e1').value="17:00";
-  card.querySelector('.s2').value="20:00"; card.querySelector('.e2').value="23:00";
-  // enable/disable second range
-  const partedSel=card.querySelector('.parted');
-  const toggle=()=>{ const on=partedSel.value==="Sí"; card.querySelector('.s2').disabled=!on; card.querySelector('.e2').disabled=!on; }
-  partedSel.onchange=toggle; toggle();
-  return card;
-}
-function fillTimeSelects(root){
-  const step=parseInt(document.getElementById('granularity').value||'60',10);
-  const opts=timeOptions(step);
-  for(const cls of ['s1','e1','s2','e2']){
-    const sel=root.querySelector('.'+cls); sel.innerHTML=opts.map(o=>`<option>${o}</option>`).join('');
+/* ---------- Paso 1: horario compacto ---------- */
+function buildScheduleTable(){
+  const tbody=document.getElementById('schedBody');
+  tbody.innerHTML='';
+  const opts=timeOptions60();
+  for(let i=0;i<7;i++){
+    const tr=document.createElement('tr'); tr.dataset.day=DAYS_EN[i];
+    tr.innerHTML=`
+      <td>${DAYS_ES[i]} <span class="mono" style="color:#777">(${DAYS_EN[i]})</span></td>
+      <td><select class="s1">${opts.map(o=>`<option>${o}</option>`).join('')}</select></td>
+      <td><select class="e1">${opts.map(o=>`<option>${o}</option>`).join('')}</select></td>
+      <td>
+        <select class="parted small">
+          <option>No</option><option selected>Sí</option>
+        </select>
+      </td>
+      <td><select class="s2">${opts.map(o=>`<option>${o}</option>`).join('')}</select></td>
+      <td><select class="e2">${opts.map(o=>`<option>${o}</option>`).join('')}</select></td>
+    `;
+    tbody.appendChild(tr);
   }
-}
-function initDays(){
-  const grid=document.getElementById('days'); grid.innerHTML='';
-  for(let i=0;i<7;i++) grid.appendChild(makeDayCard(i));
-}
-document.getElementById('granularity').onchange=()=>{ initDays(); catalog=[]; renderCatalog(); };
-initDays();
-document.getElementById('copyMonToAll').onclick=()=>{
-  const cards=[...document.querySelectorAll('.daycard')];
-  const m=cards[0];
-  for(let i=1;i<cards.length;i++){
-    for(const cls of ['s1','e1','parted','s2','e2']){
-      cards[i].querySelector('.'+cls).value=m.querySelector('.'+cls).value;
-    }
-    // activar/desactivar
-    const on=cards[i].querySelector('.parted').value==="Sí";
-    cards[i].querySelector('.s2').disabled=!on; cards[i].querySelector('.e2').disabled=!on;
-  }
-};
-
-/* -------- Catálogo común de franjas -------- */
-let catalog=[]; // [{start,end, durH}]
-function generateCatalog(){
-  const minH=parseFloat(document.getElementById('minSlotH').value||'3');
-  const step=parseInt(document.getElementById('granularity').value||'60',10);
-  // recolectar ventanas de todos los días
-  const windows={};
-  document.querySelectorAll('.daycard').forEach(c=>{
-    const day=c.dataset.day;
-    const s1=c.querySelector('.s1').value, e1=c.querySelector('.e1').value;
-    const parted=c.querySelector('.parted').value==="Sí";
-    const s2=c.querySelector('.s2').value, e2=c.querySelector('.e2').value;
-    windows[day]=[];
-    if(minutes(e1)>minutes(s1)) windows[day].push({start:s1,end:e1});
-    if(parted && minutes(e2)>minutes(s2)) windows[day].push({start:s2,end:e2});
+  // defaults razonables
+  [...tbody.querySelectorAll('tr')].forEach(tr=>{
+    tr.querySelector('.s1').value="11:00";
+    tr.querySelector('.e1').value="17:00";
+    tr.querySelector('.s2').value="20:00";
+    tr.querySelector('.e2').value="23:00";
+    toggleSecondRange(tr);
+    tr.querySelector('.parted').onchange=()=>toggleSecondRange(tr);
   });
-  // marcas globales (unión de todas las marcas de todas las ventanas)
-  let marks=[];
-  for(const day of DAYS_EN){
-    for(const w of (windows[day]||[])){
-      for(let m=minutes(w.start); m<=minutes(w.end); m+=step){
-        const h=Math.floor(m/60), mm=m%60; marks.push(`${pad2(h)}:${pad2(mm)}`);
-      }
-    }
-  }
-  const uniqMarks=uniq(marks).sort((a,b)=>minutes(a)-minutes(b));
-  const set=new Map();
-  for(let i=0;i<uniqMarks.length-1;i++){
-    for(let j=i+1;j<uniqMarks.length;j++){
-      const a=uniqMarks[i], b=uniqMarks[j];
-      const dur=hoursBetween(a,b);
-      if(dur<minH) continue;
-      // debe existir al menos un día cuya ventana contenga [a,b]
-      const fits=DAYS_EN.some(d=> (windows[d]||[]).some(w=>minutes(a)>=minutes(w.start)&&minutes(b)<=minutes(w.end)));
-      if(!fits) continue;
-      const key=a+"_"+b;
-      if(!set.has(key)) set.set(key,{start:a,end:b,durH:dur, use:true});
-    }
-  }
-  catalog=[...set.values()].sort((x,y)=> minutes(x.start)-minutes(y.start) || minutes(x.end)-minutes(y.end));
-  renderCatalog();
 }
-function renderCatalog(){
-  const box=document.getElementById('catalog'); box.innerHTML='';
-  const count=document.getElementById('catalogCount');
-  const dur=document.getElementById('catalogDur');
-  if(!catalog.length){ count.textContent="0 franjas"; dur.textContent="—"; return; }
-  let tot=0; catalog.forEach(s=> tot+=s.durH);
-  count.textContent = `${catalog.length} franjas`;
-  dur.textContent = `duración media ${(tot/catalog.length).toFixed(2)}h`;
-  // listado compacto: [✓] 11:00–13:00 (2.0h)
-  for(const s of catalog){
-    const row=document.createElement('div'); row.className='rowm';
-    const cb=document.createElement('input'); cb.type='checkbox'; cb.checked=s.use; cb.onchange=()=>{ s.use=cb.checked; };
-    const lbl=document.createElement('label'); lbl.textContent=`${s.start} — ${s.end} (${s.durH.toFixed(1)}h)`;
-    row.appendChild(cb); row.appendChild(lbl);
-    box.appendChild(row);
+function toggleSecondRange(tr){
+  const on = tr.querySelector('.parted').value==="Sí";
+  tr.querySelector('.s2').disabled=!on;
+  tr.querySelector('.e2').disabled=!on;
+}
+buildScheduleTable();
+
+document.getElementById('copyMon').onclick=()=>{
+  const rows=[...document.querySelectorAll('#schedBody tr')];
+  const m=rows[0];
+  for(const tr of rows.slice(1)){
+    tr.querySelector('.s1').value=m.querySelector('.s1').value;
+    tr.querySelector('.e1').value=m.querySelector('.e1').value;
+    tr.querySelector('.parted').value=m.querySelector('.parted').value;
+    tr.querySelector('.s2').value=m.querySelector('.s2').value;
+    tr.querySelector('.e2').value=m.querySelector('.e2').value;
+    toggleSecondRange(tr);
   }
 }
-document.getElementById('genCatalog').onclick=generateCatalog;
-document.getElementById('selAll').onclick=()=>{ catalog.forEach(s=>s.use=true); renderCatalog(); };
-document.getElementById('selNone').onclick=()=>{ catalog.forEach(s=>s.use=false); renderCatalog(); };
 
-/* -------- Paso 2: tramos de demanda por día -------- */
-const tramos = Object.fromEntries(DAYS_EN.map(d=>[d,[]])); // por día: [{start,end,min}]
-function makeTramosEditor(day){
-  const wrap=document.createElement('div'); wrap.className='daycard'; wrap.dataset.day=day;
-  const es=DAYS_ES[DAYS_EN.indexOf(day)];
-  wrap.innerHTML=`<div style="font-weight:700">${es} <span class="mono" style="color:#777">(${day})</span></div>
-    <div class="tramos"></div>
-    <div class="btns"><button class="add">Añadir tramo</button> <button class="clear">Borrar tramos</button></div>
-  `;
-  const box=wrap.querySelector('.tramos');
-  const step=parseInt(document.getElementById('granularity').value||'60',10);
-  const opts=timeOptions(step);
-
-  function draw(){
-    box.innerHTML='';
-    if(!tramos[day].length){ box.innerHTML='<small class="help">Sin tramos definidos.</small>'; return; }
-    for(let i=0;i<tramos[day].length;i++){
-      const t=tramos[day][i];
-      const row=document.createElement('div'); row.className='tramo';
-      row.innerHTML=`
-        <select class="ts">${opts.map(o=>`<option ${o===t.start?'selected':''}>${o}</option>`).join('')}</select>
-        <span>—</span>
-        <select class="te">${opts.map(o=>`<option ${o===t.end?'selected':''}>${o}</option>`).join('')}</select>
-        <span>Min:</span>
-        <input type="number" class="tmin" value="${t.min}" min="0" style="width:80px" />
-        <button class="del">Eliminar</button>
-      `;
-      row.querySelector('.ts').onchange=e=>t.start=e.target.value;
-      row.querySelector('.te').onchange=e=>t.end=e.target.value;
-      row.querySelector('.tmin').oninput=e=>t.min=parseInt(e.target.value||'0',10);
-      row.querySelector('.del').onclick=()=>{ tramos[day].splice(i,1); draw(); };
-      box.appendChild(row);
-    }
-  }
-  wrap.querySelector('.add').onclick=()=>{ tramos[day].push({start:"11:00",end:"13:00",min:2}); draw(); };
-  wrap.querySelector('.clear').onclick=()=>{ tramos[day]=[]; draw(); };
-  draw();
-  return wrap;
-}
-function initTramosEditors(){
-  const wrap=document.getElementById('tramosWrap'); wrap.innerHTML='';
-  for(const d of DAYS_EN) wrap.appendChild(makeTramosEditor(d));
-}
-initTramosEditors();
-
-document.getElementById('copyDemandMonToAll').onclick=()=>{
-  for(const d of DAYS_EN.slice(1)){ tramos[d]=JSON.parse(JSON.stringify(tramos['Mon'])); }
-  initTramosEditors();
-};
-
-document.getElementById('previewPerDay').onclick=()=>{
-  const box=document.getElementById('dayPreview'); box.innerHTML='';
-  if(!catalog.length){ box.innerHTML='<span class="tag">Catálogo vacío</span>'; return; }
-  for(const d of DAYS_EN){
-    const used = slotsForDay(d).length;
-    box.innerHTML += `<span class="tag">${d}: ${used} franjas</span>`;
-  }
-};
-
-/* -------- Derivar slots usados por día a partir del catálogo + horario del día + tramos -------- */
-function scheduleWindowsForDay(day){
-  const card=[...document.querySelectorAll('.daycard')].find(c=>c.dataset.day===day);
-  const s1=card.querySelector('.s1').value, e1=card.querySelector('.e1').value;
-  const parted=card.querySelector('.parted').value==="Sí";
-  const s2=card.querySelector('.s2').value, e2=card.querySelector('.e2').value;
+/* ---------- Catálogo común ---------- */
+let catalog=[]; // {start,end,durH,use}
+function scheduleWindowsForDay(enDay){
+  const tr=[...document.querySelectorAll('#schedBody tr')].find(r=>r.dataset.day===enDay);
+  const s1=tr.querySelector('.s1').value, e1=tr.querySelector('.e1').value;
+  const parted=tr.querySelector('.parted').value==="Sí";
+  const s2=tr.querySelector('.s2').value, e2=tr.querySelector('.e2').value;
   const wins=[]; if(minutes(e1)>minutes(s1)) wins.push({start:s1,end:e1});
   if(parted && minutes(e2)>minutes(s2)) wins.push({start:s2,end:e2});
   return wins;
 }
-function slotFitsAnyWindow(slot, wins){
-  return wins.some(w=> minutes(slot.start)>=minutes(w.start) && minutes(slot.end)<=minutes(w.end));
-}
-function minForSlotOnDay(slot, day){
-  // máximo de los tramos que incluyen totalmente la franja; si ninguno, 0
-  const trs=tramos[day]||[];
-  let m=0;
-  for(const t of trs){
-    if(minutes(slot.start)>=minutes(t.start) && minutes(slot.end)<=minutes(t.end)){
-      m=Math.max(m, parseInt(t.min||0,10));
+function generateCatalog(){
+  const minH=parseFloat(document.getElementById('minSlotH').value||'2');
+  const marks=new Set();
+  // marcas globales (cada hora a :00) en todas las ventanas
+  for(const d of DAYS_EN){
+    for(const w of scheduleWindowsForDay(d)){
+      for(let m=minutes(w.start); m<=minutes(w.end); m+=60){
+        const h=Math.floor(m/60), mm=m%60; marks.add(`${pad2(h)}:${pad2(mm)}`);
+      }
     }
   }
-  return m;
+  const all=[...marks].sort((a,b)=>minutes(a)-minutes(b));
+  const set=new Map();
+  for(let i=0;i<all.length-1;i++){
+    for(let j=i+1;j<all.length;j++){
+      const a=all[i], b=all[j];
+      const dur=hoursBetween(a,b);
+      if(dur<minH) continue;
+      // Debe caber en al menos un día
+      const fits=DAYS_EN.some(day=> scheduleWindowsForDay(day).some(w=>minutes(a)>=minutes(w.start)&&minutes(b)<=minutes(w.end)));
+      if(!fits) continue;
+      set.set(a+"_"+b,{start:a,end:b,durH:dur,use:true}); // por defecto TODO marcado
+    }
+  }
+  catalog=[...set.values()].sort((x,y)=> minutes(x.start)-minutes(y.start) || minutes(x.end)-minutes(y.end));
+  // KPI
+  const k=document.getElementById('kpiCat');
+  k.textContent = catalog.length ? `${catalog.length} franjas (media ${(catalog.reduce((s,x)=>s+x.durH,0)/catalog.length).toFixed(2)}h)` : '—';
+  const box=document.getElementById('catalogBox');
+  box.style.display='';
+  box.textContent = catalog.length ? 'Catálogo generado y seleccionado al completo.' : 'No hay franjas con esta duración mínima.';
 }
-function slotsForDay(day){
-  const wins = scheduleWindowsForDay(day);
-  // filtra catálogo global por "use" y encaje en ventanas del día
-  const selected = catalog.filter(s=>s.use && slotFitsAnyWindow(s, wins));
-  // asigna mínimo desde tramos
-  return selected.map(s=>({day, start:s.start, end:s.end, min: minForSlotOnDay(s, day)}));
-}
+document.getElementById('genCatalog').onclick=generateCatalog;
 
-/* -------- Payload final (sin solver todavía) -------- */
+/* ---------- Paso 2: Demanda por tramos (1h) ---------- */
+const demandPerDay = Object.fromEntries(DAYS_EN.map(d=>[d,new Map()])); // Map("HH:00-HH+1:00" -> min)
+
+function buildDemandUI(){
+  const wrap=document.getElementById('demandWrap'); wrap.innerHTML='';
+  for(let i=0;i<7;i++){
+    const day=DAYS_EN[i], es=DAYS_ES[i];
+    const details=document.createElement('details'); details.innerHTML=`<summary>${es} <span class="mono" style="color:#777">(${day})</span></summary>`;
+    const inner=document.createElement('div'); inner.className='row'; inner.style.flexDirection='column';
+    // botones rápidos
+    const btns=document.createElement('div'); btns.className='row';
+    const bMax=document.createElement('button'); bMax.textContent='Rellenar máximos';
+    const bZero=document.createElement('button'); bZero.textContent='Poner 0';
+    btns.appendChild(bMax); btns.appendChild(bZero);
+    inner.appendChild(btns);
+    // lista de tramos de 1 hora del día (según sus ventanas)
+    const tbl=document.createElement('table');
+    tbl.innerHTML=`<thead><tr><th>Tramo 1h</th><th>Mínimo</th></tr></thead><tbody></tbody>`;
+    const tb=tbl.querySelector('tbody');
+    const wins=scheduleWindowsForDay(day);
+    const rows=[];
+    for(const w of wins){
+      for(let t=minutes(w.start); t<minutes(w.end); t+=60){
+        const a=`${pad2(Math.floor(t/60))}:00`;
+        const b=`${pad2(Math.floor((t+60)/60))}:00`;
+        const key=`${a}-${b}`;
+        if(!demandPerDay[day].has(key)) demandPerDay[day].set(key, NaN); // NaN = sin tocar => usará por defecto nº empleados
+        const tr=document.createElement('tr');
+        const td1=document.createElement('td'); td1.textContent=key;
+        const td2=document.createElement('td'); 
+        const sel=document.createElement('select');
+        // opciones 0..#empleados (y quizá más)
+        const N=Math.max(empCount(), 20); // tope visual
+        for(let k=0;k<=N;k++){ const opt=document.createElement('option'); opt.value=String(k); opt.textContent=String(k); sel.appendChild(opt); }
+        // si ya tiene valor, selecciónalo
+        const cur=demandPerDay[day].get(key);
+        if(!Number.isNaN(cur)) sel.value=String(cur);
+        sel.onchange=()=> demandPerDay[day].set(key, parseInt(sel.value,10));
+        td2.appendChild(sel);
+        tr.appendChild(td1); tr.appendChild(td2);
+        tb.appendChild(tr);
+        rows.push(sel);
+      }
+    }
+    bMax.onclick=()=>{ const n=empCount(); rows.forEach(sel=> sel.value=String(n)); rows.forEach(sel=> sel.dispatchEvent(new Event('change'))); };
+    bZero.onclick=()=>{ rows.forEach(sel=> sel.value='0'); rows.forEach(sel=> sel.dispatchEvent(new Event('change'))); };
+    inner.appendChild(tbl);
+    details.appendChild(inner);
+    wrap.appendChild(details);
+  }
+}
+buildDemandUI();
+
+// si cambia el horario o empleados, conviene regenerar la demanda visible
+document.getElementById('emps').addEventListener('input', ()=>buildDemandUI());
+document.getElementById('schedBody').addEventListener('change', (e)=>{
+  if(e.target.tagName==='SELECT') { buildDemandUI(); }
+});
+
+/* ---------- Construcción del payload ---------- */
+function employeesObj(){
+  const ids=(document.getElementById('emps').value||'').split(',').map(x=>x.trim()).filter(Boolean);
+  const target=parseFloat(document.getElementById('target').value||'40');
+  const tol=parseFloat(document.getElementById('tol').value||'2');
+  const maxBlocks=parseInt(document.getElementById('allowSplit').value||'2',10);
+  const minDay=parseFloat(document.getElementById('minDay').value||'3');
+  const maxDay=parseFloat(document.getElementById('maxDay').value||'9');
+  const minRest=parseFloat(document.getElementById('minRest').value||'3');
+  return {
+    ids, target, tol, maxBlocks, minDay, maxDay, minRest,
+    toList(){
+      return ids.map(id=>({
+        id,
+        target_hours: target,
+        max_blocks_per_day: maxBlocks,
+        min_hours_per_day: minDay,
+        max_hours_per_day: maxDay,
+        min_rest_between_blocks: minRest,
+        availability: Object.fromEntries(DAYS_EN.map(d=>[d, scheduleWindowsForDay(d)]))
+      }));
+    }
+  };
+}
+function slotsSelectedForDay(day){
+  const wins=scheduleWindowsForDay(day);
+  const fits = (s)=> wins.some(w=> minutes(s.start)>=minutes(w.start) && minutes(s.end)<=minutes(w.end));
+  return catalog.filter(s=> s.use && fits(s)).map(s=>({day, start:s.start, end:s.end}));
+}
+function minForSlotFromHourly(slot, day, defaultMin){
+  // para el slot [start,end], miramos las horas enteras dentro y tomamos el máximo
+  let maxm = 0, found=false;
+  for(let t=minutes(slot.start); t<minutes(slot.end); t+=60){
+    const a=`${pad2(Math.floor(t/60))}:00`;
+    const b=`${pad2(Math.floor((t+60)/60))}:00`;
+    const key=`${a}-${b}`;
+    if(demandPerDay[day].has(key)){
+      const v=demandPerDay[day].get(key);
+      if(Number.isNaN(v)) { maxm = Math.max(maxm, defaultMin); } else { maxm = Math.max(maxm, v); }
+      found = true;
+    }
+  }
+  if(!found) return defaultMin;
+  return maxm;
+}
 function buildPayload(){
-  // por ahora generamos una semana; si weeks>1, repetiremos más tarde
-  const employees = (document.getElementById('emps').value||'')
-    .split(',').map(x=>x.trim()).filter(Boolean)
-    .map(id=>({
-      id, target_hours: parseFloat(document.getElementById('target').value||'40'),
-      max_blocks_per_day: parseInt(document.getElementById('allowSplit').value||'2',10),
-      min_hours_per_day: parseFloat(document.getElementById('minDay').value||'3'),
-      max_hours_per_day: parseFloat(document.getElementById('maxDay').value||'9'),
-      min_rest_between_blocks: parseFloat(document.getElementById('minRest').value||'3'),
-      availability: Object.fromEntries(DAYS_EN.map(d=>[d, scheduleWindowsForDay(d)]))
-    }));
+  const emps=employeesObj();
+  if(emps.ids.length===0){ throw new Error('Necesitas al menos 1 empleado'); }
+  if(catalog.length===0){ throw new Error('Genera primero el catálogo de franjas'); }
 
   const slots=[]; const mins=[];
   for(const d of DAYS_EN){
-    const list=slotsForDay(d);
-    for(const s of list){ 
-      slots.push({day:d, start:s.start, end:s.end});
-      mins.push(s.min||0);
+    const sel=slotsSelectedForDay(d);
+    for(const s of sel){
+      const m = minForSlotFromHourly(s, d, emps.ids.length); // por defecto: máximo personal = nº empleados
+      slots.push(s);
+      mins.push(m);
     }
   }
   return {
     weeks: parseInt(document.getElementById('weeks').value||'2',10),
-    tolerance: parseFloat(document.getElementById('tol').value||'2'),
-    employees, slots, min_per_slot: mins
+    tolerance: emps.tol,
+    employees: emps.toList(),
+    slots, min_per_slot: mins
   };
 }
 
-document.getElementById('showPayload').onclick=()=>{
-  const payload = buildPayload();
-  const box = document.getElementById('payloadBox');
-  box.style.display='block';
-  box.textContent = JSON.stringify(payload, null, 2);
+/* ---------- Render de resultado (horarios por celda) ---------- */
+function mergeIntervals(intervals){
+  // intervals: [{start,end}] HH:MM contiguos -> agrupa
+  if(!intervals.length) return [];
+  const toMin=(t)=>minutes(t);
+  const arr=intervals.slice().sort((a,b)=> toMin(a.start)-toMin(b.start));
+  const out=[{...arr[0]}];
+  for(let i=1;i<arr.length;i++){
+    const prev=out[out.length-1], cur=arr[i];
+    if(prev.end===cur.start){ // contiguo
+      prev.end=cur.end;
+    }else{
+      out.push({...cur});
+    }
+  }
+  return out;
+}
+function renderScheduleTable(empsList, slots, assignments){
+  // mapa emp -> día -> intervalos
+  const map = {};
+  for(const e of empsList){ map[e.id]=Object.fromEntries(DAYS_EN.map(d=>[d,[]])); }
+  for(let i=0;i<assignments.length;i++){
+    const slot=slots[i];
+    for(const eid of assignments[i]||[]){
+      if(map[eid]) map[eid][slot.day].push({start:slot.start, end:slot.end});
+    }
+  }
+  // fusionar contiguos y formatear
+  const fmt=(ivs)=> mergeIntervals(ivs).map(r=>`${r.start}–${r.end}`).join(', ');
+  // totales por empleado
+  const dur=(s)=>hoursBetween(s.start,s.end);
+  const totalHours=(ivs)=> mergeIntervals(ivs).reduce((acc,r)=> acc+dur(r), 0);
+
+  let html='<table><thead><tr><th>Empleado</th>';
+  for(const d of DAYS_ES) html+=`<th>${d}</th>`;
+  html+='<th>Total h</th></tr></thead><tbody>';
+
+  for(const e of empsList){
+    html+=`<tr><td><b>${e.id}</b></td>`;
+    let tot=0;
+    for(const day of DAYS_EN){
+      const ivs=map[e.id][day];
+      const txt=fmt(ivs) || '—';
+      const th=totalHours(ivs); tot+=th;
+      html+=`<td>${txt}</td>`;
+    }
+    html+=`<td class="mono">${tot.toFixed(1)}</td></tr>`;
+  }
+  html+='</tbody></table>';
+  document.getElementById('tableWrap').innerHTML=html;
+}
+
+/* ---------- Cálculo ---------- */
+document.getElementById('run').onclick=async ()=>{
+  try{
+    const payload=buildPayload();
+
+    // Repetir semanas (si >1): duplicamos arrays (misma semana repetida).
+    const n=payload.weeks;
+    if(n>1){
+      const repSlots=[], repMins=[];
+      for(let k=0;k<n;k++){ repSlots.push(...payload.slots); repMins.push(...payload.min_per_slot); }
+      payload.slots=repSlots; payload.min_per_slot=repMins;
+    }
+
+    const res=await fetch('/solve/greedy_v2',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(payload)});
+    const data=await res.json();
+
+    // Comprobar factibilidad: ninguna franja con déficit.
+    let feasible=true, msgs=[];
+    for(let i=0;i<payload.slots.length;i++){
+      const need=payload.min_per_slot[i];
+      const got=(data.assignments && data.assignments[i]) ? data.assignments[i].length : 0;
+      if(got<need){ feasible=false; const s=payload.slots[i]; msgs.push(`Déficit ${s.day} ${s.start}-${s.end}: ${got}/${need}`); }
+    }
+
+    const imp=document.getElementById('impossible');
+    const table=document.getElementById('tableWrap');
+
+    if(!feasible){
+      table.innerHTML='';
+      imp.style.display='';
+      imp.textContent="IMPOSSIBLE: no se puede cuadrar con la demanda actual.\n\nDetalle:\n"+msgs.join('\n');
+      return;
+    }else{
+      imp.style.display='none';
+      imp.textContent='';
+    }
+
+    // Renderizar tabla con HORARIOS por celda
+    renderScheduleTable(payload.employees, payload.slots, data.assignments||[]);
+
+  }catch(err){
+    document.getElementById('impossible').style.display='';
+    document.getElementById('impossible').textContent = 'Error: '+(err.message||String(err));
+  }
 };
 </script>
 </body>
