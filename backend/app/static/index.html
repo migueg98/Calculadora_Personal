@@ -5,11 +5,10 @@
 <title>Cuadrantes Hostelería — Semana</title>
 <style>
 body{font-family:system-ui,Segoe UI,Arial;margin:20px;max-width:1200px}
-textarea,input,button{font-size:14px;padding:8px;margin:6px 0}
+input,select,button{font-size:14px;padding:8px;margin:6px 0}
 label{font-weight:600;margin-top:12px;display:block}
 section.day{border:1px solid #eee;padding:12px;border-radius:10px;margin:10px 0}
 section.day h3{margin:0 0 6px 0}
-.small{width:160px}
 .inline{display:flex;gap:10px;align-items:center;flex-wrap:wrap}
 .slots{margin-top:8px}
 .slot-row{display:flex;gap:10px;align-items:center;padding:6px 0;border-bottom:1px dashed #eee}
@@ -24,13 +23,14 @@ td.hit{background:#f3fbf3}
 .warn{background:#fff9e6;border:1px solid #ffe08a;padding:10px;margin-top:10px;white-space:pre-wrap}
 .help{color:#555;font-size:13px;margin:8px 0}
 hr{border:none;border-top:1px solid #eee;margin:12px 0}
+.small{width:140px}
 </style>
 </head>
 <body>
   <h1>Cuadrantes — Semana (reglas duras)</h1>
   <p class="help">
-    Para cada día, escribe las <b>marcas horarias</b> (horas separadas por coma) y pulsa <b>Generar franjas</b>. Se crearán las franjas adyacentes
-    (ej: <i>11:00,13:00,16:00 → 11:00–13:00; 13:00–16:00</i>). Marca las franjas que se usan y define su <b>mínimo</b>.
+    Para cada día, elige hasta <b>dos rangos</b> (p. ej. 11–17 y 20–23). El sistema genera <b>todas las franjas posibles</b>
+    dentro de esos rangos, con una <b>duración mínima</b> y un <b>paso</b> configurables. Marca qué franjas se usan y el <b>mínimo</b> de personal por franja.
   </p>
 
   <!-- Config general -->
@@ -48,12 +48,30 @@ hr{border:none;border-top:1px solid #eee;margin:12px 0}
       <input id="tol" class="small" value="2">
     </div>
     <div>
-      <label>Máx. horas/día</label>
-      <input id="maxDay" class="small" value="10">
+      <label>Máx. horas/día (por empleado)</label>
+      <input id="maxDay" class="small" value="9">
     </div>
     <div>
-      <label>Máx. bloques/día</label>
-      <input id="maxBlocks" class="small" value="2">
+      <label>Permitir turno partido (bloques/día)</label>
+      <select id="maxBlocks" class="small">
+        <option value="1">No (1 bloque)</option>
+        <option value="2" selected>Sí (2 bloques)</option>
+      </select>
+    </div>
+  </section>
+
+  <section class="inline" style="align-items:flex-end">
+    <div>
+      <label>Duración mínima de franja (horas)</label>
+      <input id="minSlotHours" class="small" value="2">
+    </div>
+    <div>
+      <label>Paso para generar marcas (minutos)</label>
+      <select id="stepMin" class="small">
+        <option value="30">30</option>
+        <option value="60" selected>60</option>
+        <option value="120">120</option>
+      </select>
     </div>
   </section>
 
@@ -73,12 +91,13 @@ hr{border:none;border-top:1px solid #eee;margin:12px 0}
 const DAYS_EN = ["Mon","Tue","Wed","Thu","Fri","Sat","Sun"];
 const DAYS_ES = ["Lun","Mar","Mié","Jue","Vie","Sáb","Dom"];
 
-// ----- Utilidades de tiempo -----
+// -------- utilidades de tiempo --------
+function pad2(n){ return String(n).padStart(2,'0'); }
 function normTime(t){
-  // Normaliza "24:00" a "23:59"
+  // acepta "24:00" -> "23:59"
   const [h,m] = t.split(':').map(n=>parseInt(n||'0',10));
   if (h===24 && (m||0)===0) return "23:59";
-  return `${String(h).padStart(2,'0')}:${String(m).padStart(2,'0')}`;
+  return `${pad2(h)}:${pad2(m)}`;
 }
 function minutes(t){
   const [h,m] = t.split(':').map(Number);
@@ -88,20 +107,17 @@ function minutes(t){
 function hoursBetween(a,b){
   return Math.max(0,(minutes(b)-minutes(a)))/60.0;
 }
-
-// ----- Generar franjas desde marcas -----
-function genSlotsFromMarks(marksStr){
-  // admite "11:00,13:00,16:00" o con espacios; ordena y quita duplicados
-  const parts = marksStr.split(/[,;\s]+/).map(x=>x.trim()).filter(Boolean).map(normTime);
-  const uniq = Array.from(new Set(parts)).sort((a,b)=>minutes(a)-minutes(b));
-  const out = [];
-  for (let i=0;i<uniq.length-1;i++){
-    out.push({start: uniq[i], end: uniq[i+1]});
+function timeList(step=60){
+  const out=[];
+  for(let m=0;m<=24*60;m+=step){
+    let h=Math.floor(m/60), mm=m%60;
+    out.push(`${pad2(h)}:${pad2(mm)}`);
   }
   return out;
 }
+const TIME_OPTIONS = timeList(30); // para selects (más fino)
 
-// ----- UI por día -----
+// -------- UI por día (2 rangos con desplegables) --------
 function daySection(dayIdx){
   const en = DAYS_EN[dayIdx], es = DAYS_ES[dayIdx];
   const sec = document.createElement('section');
@@ -110,44 +126,126 @@ function daySection(dayIdx){
   sec.innerHTML = `
     <h3>${es} <span style="font-weight:400;color:#777">(${en})</span></h3>
     <div class="inline">
-      <label>Marcas horarias (coma)</label>
-      <input class="marks" style="width:420px" value="11:00,13:00,16:00,18:00,20:00,23:59">
-      <label style="margin-left:8px">Cerrado</label>
-      <input type="checkbox" class="closed">
+      <label style="min-width:95px">Rango 1</label>
+      <select class="s1 small"></select>
+      <span>—</span>
+      <select class="e1 small"></select>
+
+      <label style="min-width:110px;margin-left:12px">Turno partido</label>
+      <input type="checkbox" class="parted" checked>
+
+      <label style="min-width:95px;margin-left:12px">Rango 2</label>
+      <select class="s2 small"></select>
+      <span>—</span>
+      <select class="e2 small"></select>
+
       <button class="gen">Generar franjas</button>
+      <label style="margin-left:10px">Cerrado</label>
+      <input type="checkbox" class="closed">
     </div>
     <div class="slots"></div>
   `;
-  // eventos
-  sec.querySelector('.gen').onclick = ()=>{
-    renderSlots(sec);
-  };
+
+  // Rellenar selects con opciones de tiempo
+  for (const cls of ["s1","e1","s2","e2"]){
+    const sel = sec.querySelector(`.${cls}`);
+    TIME_OPTIONS.forEach(t=>{
+      const opt=document.createElement('option');
+      opt.value=t; opt.textContent=t;
+      sel.appendChild(opt);
+    });
+  }
+  // Defaults típicos
+  sec.querySelector('.s1').value = "11:00";
+  sec.querySelector('.e1').value = "17:00";
+  sec.querySelector('.s2').value = "20:00";
+  sec.querySelector('.e2').value = "23:59";
+
+  // Eventos
+  const parted = sec.querySelector('.parted');
+  const s2 = sec.querySelector('.s2');
+  const e2 = sec.querySelector('.e2');
+  function toggleSecondRange(){
+    const on = parted.checked;
+    s2.disabled = e2.disabled = !on;
+  }
+  toggleSecondRange();
+  parted.onchange = toggleSecondRange;
+
+  sec.querySelector('.gen').onclick = ()=> renderSlots(sectionToConfig(sec), sec);
   sec.querySelector('.closed').onchange = ()=>{
     const closed = sec.querySelector('.closed').checked;
-    sec.querySelector('.marks').disabled = closed;
-    sec.querySelector('.gen').disabled = closed;
+    const controls = sec.querySelectorAll('select,button,input[type="checkbox"].parted');
+    controls.forEach(el=>{ el.disabled = closed; });
     sec.querySelector('.slots').innerHTML = closed ? '<div style="color:#999">Día cerrado</div>' : '';
   };
+
   return sec;
 }
 
-function renderSlots(section){
+// Convierte una sección de día a config de ventanas
+function sectionToConfig(sec){
+  const day = sec.dataset.day;
+  const closed = sec.querySelector('.closed').checked;
+  if (closed) return {day, closed:true, windows:[]};
+  const s1 = normTime(sec.querySelector('.s1').value);
+  const e1 = normTime(sec.querySelector('.e1').value);
+  const parted = sec.querySelector('.parted').checked;
+  const cfg = { day, closed:false, windows: [] };
+  if (minutes(e1) > minutes(s1)) cfg.windows.push({start:s1, end:e1});
+  if (parted){
+    const s2 = normTime(sec.querySelector('.s2').value);
+    const e2 = normTime(sec.querySelector('.e2').value);
+    if (minutes(e2) > minutes(s2)) cfg.windows.push({start:s2, end:e2});
+  }
+  return cfg;
+}
+
+// Genera todas las franjas posibles dentro de las ventanas, con paso y duración mínima
+function generateAllSlots(windows, stepMin, minHours){
+  const marks = [];
+  for (const w of windows){
+    for (let m=minutes(w.start); m<=minutes(w.end); m+=stepMin){
+      const h = Math.floor(m/60), mm = m%60;
+      const t = `${pad2(h)}:${pad2(mm)}`;
+      marks.push(t);
+    }
+  }
+  // marcas únicas ordenadas
+  const uniq = Array.from(new Set(marks)).sort((a,b)=>minutes(a)-minutes(b));
+  const out = [];
+  for (let i=0;i<uniq.length-1;i++){
+    for (let j=i+1;j<uniq.length;j++){
+      const dur = hoursBetween(uniq[i], uniq[j]);
+      if (dur >= minHours){
+        // Solo si el intervalo [i,j] está dentro de una de las ventanas (contiguo)
+        if (windows.some(w => minutes(uniq[i])>=minutes(w.start) && minutes(uniq[j])<=minutes(w.end))){
+          out.push({start:uniq[i], end:uniq[j]});
+        }
+      }
+    }
+  }
+  return out;
+}
+
+function renderSlots(cfg, section){
   const cont = section.querySelector('.slots');
   cont.innerHTML = '';
-  const closed = section.querySelector('.closed').checked;
-  if (closed){ cont.innerHTML = '<div style="color:#999">Día cerrado</div>'; return; }
-  const marksStr = section.querySelector('.marks').value.trim();
-  const slots = genSlotsFromMarks(marksStr);
+  if (cfg.closed || !cfg.windows.length){
+    cont.innerHTML = '<div style="color:#999">Día cerrado</div>'; return;
+  }
+  const stepMin = parseInt(document.getElementById('stepMin').value || '60', 10);
+  const minSlotHours = parseFloat(document.getElementById('minSlotHours').value || '2');
+  const slots = generateAllSlots(cfg.windows, stepMin, minSlotHours);
   if (!slots.length){
-    cont.innerHTML = '<div style="color:#999">Añade al menos dos marcas para generar franjas.</div>';
-    return;
+    cont.innerHTML = '<div style="color:#999">No hay franjas con esas condiciones.</div>'; return;
   }
   // pintar cada franja con checkbox y mínimo
   for (const sl of slots){
     const row = document.createElement('div');
     row.className = 'slot-row';
     row.innerHTML = `
-      <input type="checkbox" class="use" checked>
+      <input type="checkbox" class="use">
       <label>${sl.start} — ${sl.end}</label>
       <span>Min:</span>
       <input type="number" class="min" value="0" min="0" style="width:80px">
@@ -158,11 +256,11 @@ function renderSlots(section){
   }
 }
 
-// ----- Construir payload semana desde la UI -----
+// -------- construir payload para el solver --------
 function collectWeekPayload(){
   const target   = parseFloat(document.getElementById('target').value || '40');
   const tol      = parseFloat(document.getElementById('tol').value || '2');
-  const maxDay   = parseFloat(document.getElementById('maxDay').value || '10');
+  const maxDay   = parseFloat(document.getElementById('maxDay').value || '9');
   const maxBlocks= parseInt(document.getElementById('maxBlocks').value || '2',10);
   const empsTxt  = document.getElementById('emps').value.trim();
   const employees = empsTxt.split(',').map(id=>({
@@ -170,7 +268,7 @@ function collectWeekPayload(){
     target_hours: target,
     max_hours_per_day: maxDay,
     max_blocks_per_day: maxBlocks,
-    availability: {} // se rellena por día abajo
+    availability: {} // se rellena por día abajo (union de ventanas del día)
   })).filter(e=>e.id);
 
   const slots = [];
@@ -181,18 +279,16 @@ function collectWeekPayload(){
     const closed = sec.querySelector('.closed').checked;
     if (closed) return;
 
-    const rows = sec.querySelectorAll('.slot-row');
-    // construir disponibilidad global del día para todos los empleados como el rango más amplio marcado
-    // (opción simple: si hay slots seleccionados, disponibilidad desde el primer inicio al último fin)
-    const selected = Array.from(rows).filter(r=>r.querySelector('.use').checked);
-    if (selected.length){
-      const firstStart = selected[0].dataset.start;
-      const lastEnd = selected[selected.length-1].dataset.end;
+    const cfg = sectionToConfig(sec);
+    // disponibilidad = las ventanas del día
+    if (cfg.windows.length){
       for (const e of employees){
-        e.availability[day] = [{start:firstStart, end:lastEnd}];
+        e.availability[day] = cfg.windows.map(w=>({start:w.start, end:w.end}));
       }
     }
-    // slots seleccionados + min por slot
+
+    // recoger solo las franjas seleccionadas
+    const rows = sec.querySelectorAll('.slot-row');
     for (const r of rows){
       const use = r.querySelector('.use').checked;
       if (!use) continue;
@@ -206,18 +302,12 @@ function collectWeekPayload(){
   return {employees, slots, mins, tol};
 }
 
-// ----- Render matriz resultado -----
+// -------- tabla resultado --------
 function renderMatrix(emps, slotsV2, assignments){
-  // días en orden
   const days = DAYS_EN;
   const mapIdx = Object.fromEntries(emps.map((e,i)=>[e.id,i]));
   const hrs = Array.from({length: emps.length}, ()=>Object.fromEntries(days.map(d=>[d,0])));
   const total = new Array(emps.length).fill(0);
-
-  function hoursBetween(a,b){ // local (con 24:00→23:59)
-    const norm = t=>{const [h,m]=t.split(':').map(Number);return (h===24&&m===0)?(24*60-1):(h*60+m);}
-    return Math.max(0,(norm(b)-norm(a)))/60.0;
-  }
 
   for (let i=0;i<assignments.length;i++){
     const slot = slotsV2[i];
@@ -248,18 +338,18 @@ function renderMatrix(emps, slotsV2, assignments){
   document.getElementById('tableWrap').innerHTML = html;
 }
 
-// ----- Inicialización de la página -----
+// -------- init --------
 (function init(){
   const wrap = document.getElementById('days');
   for (let i=0;i<DAYS_EN.length;i++){
     const sec = daySection(i);
     wrap.appendChild(sec);
-    // generar por defecto
-    renderSlots(sec);
+    // genera franjas por defecto
+    renderSlots(sectionToConfig(sec), sec);
   }
 })();
 
-// ----- Calcular semana -----
+// -------- calcular --------
 document.getElementById('calcWeek').onclick = async () => {
   const {employees, slots, mins, tol} = collectWeekPayload();
   if (!slots.length){
@@ -277,7 +367,6 @@ document.getElementById('calcWeek').onclick = async () => {
   });
   const data = await res.json();
 
-  // Pintar tabla y avisos
   renderMatrix(employees, slots, data.assignments || []);
   const warnBox = document.getElementById('warnings');
   if (data.warnings && data.warnings.length){
