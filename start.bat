@@ -17,7 +17,7 @@ python -m pip install --upgrade pip >nul
 python -m pip install -r requirements.txt
 
 REM Abrir la documentación en el navegador
-start "" http://127.0.0.1:8000/docs
+start "" http://127.0.0.1:8000
 
 REM Lanzar el servidor
 python -m uvicorn app.main:app --reload
