@@ -6,6 +6,9 @@ from typing import List, Dict
 from datetime import time
 import os
 
+# Importa los solvers desde solver.py
+from app.solver import greedy_assign, greedy_assign_v2
+
 app = FastAPI(title="Cuadrantes Hostelería", version="0.1.0")
 
 # ---------- Servir la mini UI ----------
@@ -15,9 +18,9 @@ app.mount("/static", StaticFiles(directory="app/static"), name="static")
 @app.get("/", response_class=HTMLResponse)
 def home():
     index_path = os.path.join("app", "static", "index.html")
-    return FileResponse(index_path)
+    return FileResponse(index_path, media_type="text/html")
 
-# ---------- Helpers ----------
+# ---------- Helpers SOLO para /slots/generate ----------
 def _parse_time(hhmm: str) -> time:
     h, m = map(int, hhmm.split(":"))
     # Permitir "24:00" (lo mapeamos a 23:59 para evitar error en datetime.time)
@@ -28,12 +31,7 @@ def _parse_time(hhmm: str) -> time:
 def _to_str(t: time) -> str:
     return f"{t.hour:02d}:{t.minute:02d}"
 
-def _slot_hours(start: str, end: str) -> float:
-    a = _parse_time(start)
-    b = _parse_time(end)
-    return ((b.hour*60 + b.minute) - (a.hour*60 + a.minute)) / 60.0
-
-# ---------- Modelos ----------
+# ---------- Modelos (v1) ----------
 class GenerateSlotsRequest(BaseModel):
     marks: List[str]            # ["11:00","13:00","16:00","18:00","20:00","24:00"]
     adjacent_only: bool = True
@@ -86,45 +84,7 @@ def generate_slots(payload: GenerateSlotsRequest):
             seen.add(key); unique.append(s)
     return {"slots": unique}
 
-# ---------- Algoritmo mínimo (greedy) ----------
-def greedy_assign(
-    slots: List[Dict[str, str]],       # [{"start":"HH:MM","end":"HH:MM"}...]
-    min_per_slot: List[int],           # misma longitud que slots
-    employees: List[Dict[str, float]], # [{"id":"E1","target_hours":40.0}...]
-    tolerance: float = 2.0
-):
-    dur = [_slot_hours(s["start"], s["end"]) for s in slots]
-    hours_assigned = {e["id"]: 0.0 for e in employees}
-    assignments: List[List[str]] = [[] for _ in slots]
-
-    for i, need in enumerate(min_per_slot):
-        attempts = 0
-        while len(assignments[i]) < need and attempts < 1000:
-            # ordenar por horas restantes (objetivo - asignadas), desc
-            candidates = sorted(
-                employees,
-                key=lambda e: (e["target_hours"] - hours_assigned[e["id"]]),
-                reverse=True
-            )
-            picked = None
-            for c in candidates:
-                remaining = c["target_hours"] - hours_assigned[c["id"]]
-                # permitimos pasarnos hasta 'tolerance' horas
-                if remaining + tolerance >= dur[i]:
-                    picked = c
-                    break
-            if picked is None:
-                # si nadie tiene margen, elige el que menos se pasa
-                picked = max(
-                    employees,
-                    key=lambda e: (e["target_hours"] - hours_assigned[e["id"]])
-                )
-            assignments[i].append(picked["id"])
-            hours_assigned[picked["id"]] += dur[i]
-            attempts += 1
-
-    return assignments, hours_assigned
-
+# ---------- Endpoint Greedy v1 (simple) ----------
 @app.post("/solve/greedy", response_model=GreedySolveResponse)
 def solve_greedy(payload: GreedySolveRequest):
     if len(payload.slots) != len(payload.min_per_slot):
@@ -140,3 +100,51 @@ def solve_greedy(payload: GreedySolveRequest):
         tolerance=payload.tolerance,
     )
     return {"assignments": assignments, "hours_assigned": hours_assigned}
+
+# ---------- Modelos (v2 con reglas duras) ----------
+class SlotV2(BaseModel):
+    day: str     # "Mon","Tue","Wed","Thu","Fri","Sat","Sun" (o "Lun", etc.)
+    start: str
+    end: str
+
+class EmployeeV2(BaseModel):
+    id: str
+    target_hours: float
+    max_hours_per_day: float = 10.0
+    max_blocks_per_day: int = 2
+    # {"Mon":[{"start":"11:00","end":"23:59"}], ...}
+    availability: Dict[str, List[Dict[str, str]]] = {}
+
+class GreedyV2Request(BaseModel):
+    slots: List[SlotV2]
+    min_per_slot: List[int]
+    employees: List[EmployeeV2]
+    tolerance: float = 2.0
+
+class GreedyV2Response(BaseModel):
+    assignments: List[List[str]]
+    hours_assigned: Dict[str, float]
+    warnings: List[str] = []
+
+# ---------- Endpoint Greedy v2 (reglas duras) ----------
+@app.post("/solve/greedy_v2", response_model=GreedyV2Response)
+def solve_greedy_v2(payload: GreedyV2Request):
+    if len(payload.slots) != len(payload.min_per_slot):
+        raise HTTPException(status_code=400, detail="slots y min_per_slot deben tener la misma longitud")
+
+    slots = [{"day": s.day, "start": s.start, "end": s.end} for s in payload.slots]
+    employees = [{
+        "id": e.id,
+        "target_hours": e.target_hours,
+        "max_hours_per_day": e.max_hours_per_day,
+        "max_blocks_per_day": e.max_blocks_per_day,
+        "availability": e.availability
+    } for e in payload.employees]
+
+    assignments, hours_assigned, warnings = greedy_assign_v2(
+        slots=slots,
+        min_per_slot=payload.min_per_slot,
+        employees=employees,
+        tolerance=payload.tolerance
+    )
+    return {"assignments": assignments, "hours_assigned": hours_assigned, "warnings": warnings}

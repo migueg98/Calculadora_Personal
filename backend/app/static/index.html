@@ -2,61 +2,64 @@
 <html>
 <head>
 <meta charset="utf-8">
-<title>Cuadrantes Hostelería — Demo</title>
+<title>Cuadrantes Hostelería — Semana</title>
 <style>
-body{font-family:system-ui,Segoe UI,Arial;margin:20px;max-width:900px}
-textarea,input,button{font-size:14px;padding:8px;margin:6px 0;width:100%}
+body{font-family:system-ui,Segoe UI,Arial;margin:20px;max-width:1100px}
+textarea,input,button{font-size:14px;padding:8px;margin:6px 0}
 label{font-weight:600;margin-top:12px;display:block}
-pre{background:#f5f5f5;padding:12px;white-space:pre-wrap}
 .grid{display:grid;grid-template-columns:1fr 1fr;gap:16px}
-.small{width:200px}
-.row{display:flex;gap:12px;align-items:center;flex-wrap:wrap}
+.small{width:180px}
+.btns{display:flex;gap:8px;flex-wrap:wrap;margin-top:8px}
+table{border-collapse:collapse;width:100%;margin-top:16px}
+th,td{border:1px solid #e3e3e3;padding:8px;text-align:center}
+th{background:#fafafa;font-weight:700}
+td.emp{font-weight:600;text-align:left}
+td.hit{background:#f3fbf3}
+.warn{background:#fff9e6;border:1px solid #ffe08a;padding:10px;margin-top:10px;white-space:pre-wrap}
+.help{color:#555;font-size:13px;margin:8px 0}
+hr{border:none;border-top:1px solid #eee;margin:12px 0}
 </style>
 </head>
 <body>
-  <h1>Cuadrantes — Greedy</h1>
-  <p>Introduce <b>slots</b> (uno por línea, HH:MM-HH:MM), <b>mínimos</b> (coma) y <b>empleados</b> (IDs por coma).</p>
+  <h1>Cuadrantes — Semana (reglas duras)</h1>
+  <p class="help">
+    La tabla muestra <b>horas asignadas</b> por empleado y por día (Lun-Dom). Los mínimos y los slots se aplican a todos los días por igual.
+  </p>
 
   <div class="grid">
     <div>
-      <label>Slots (uno por línea)</label>
-      <textarea id="slots" rows="6">11:00-13:00
+      <label>Slots (uno por línea, HH:MM-HH:MM)</label>
+      <textarea id="slots" rows="7">11:00-13:00
 13:00-16:00
+16:00-18:00
+18:00-20:00
 20:00-23:59</textarea>
-    </div>
-    <div>
-      <label>Mínimos por slot (coma)</label>
-      <input id="mins" value="3,4,3">
-      <label>Empleados (IDs, coma)</label>
-      <input id="emps" value="E1,E2,E3,E4,E5,E6">
-      <div class="row">
-        <div>
-          <label>Objetivo horas</label>
-          <input id="target" class="small" value="40">
-        </div>
-        <div>
-          <label>Tolerancia ±h</label>
-          <input id="tol" class="small" value="2">
-        </div>
+
+      <label>Mínimos por slot (coma, mismo nº que slots)</label>
+      <input id="mins" value="7,11,6,2,11">
+
+      <label>Empleados (IDs separados por coma)</label>
+      <input id="emps" value="E1,E2,E3,E4,E5,E6,E7,E8,E9,E10,E11,E12,E13,E14,E15">
+
+      <div class="help">
+        Ejemplo típico: 11-13=7, 13-16=11, 16-18=6, 18-20=2, 20-24≈11.
       </div>
+    </div>
+
+    <div>
+      <label>Objetivo horas por empleado</label>
+      <input id="target" class="small" value="40">
+      <label>Tolerancia (± horas)</label>
+      <input id="tol" class="small" value="2">
 
       <hr>
-      <h3>Reglas duras (v2)</h3>
-      <div class="row">
-        <div>
-          <label>Día (v2)</label>
-          <input id="day" class="small" value="Mon">
-        </div>
-        <div>
-          <label>Max h/día</label>
-          <input id="maxDay" class="small" value="10">
-        </div>
-        <div>
-          <label>Max bloques/día</label>
-          <input id="maxBlocks" class="small" value="2">
-        </div>
-      </div>
-      <div class="row">
+      <h3>Reglas duras</h3>
+      <label>Máx. horas por día</label>
+      <input id="maxDay" class="small" value="10">
+      <label>Máx. bloques por día</label>
+      <input id="maxBlocks" class="small" value="2">
+
+      <div style="display:flex;gap:12px;flex-wrap:wrap">
         <div>
           <label>Disponibilidad global (inicio)</label>
           <input id="availStart" class="small" value="11:00">
@@ -67,70 +70,145 @@ pre{background:#f5f5f5;padding:12px;white-space:pre-wrap}
         </div>
       </div>
 
-      <button id="run">Calcular (simple)</button>
-      <button id="runV2">Calcular (reglas duras)</button>
+      <div class="btns">
+        <button id="runWeek">Calcular semana (reglas duras)</button>
+      </div>
     </div>
   </div>
 
-  <h3>Resultado</h3>
-  <pre id="out"></pre>
+  <div id="tableWrap"></div>
+  <div id="warnings" class="warn" style="display:none"></div>
 
 <script>
+const DAYS_EN = ["Mon","Tue","Wed","Thu","Fri","Sat","Sun"];
+const DAYS_ES = ["Lun","Mar","Mié","Jue","Vie","Sáb","Dom"];
+
 function parseBasicInputs(){
   const slotsTxt = document.getElementById('slots').value.trim();
-  const minsTxt = document.getElementById('mins').value.trim();
-  const empsTxt = document.getElementById('emps').value.trim();
-  const target = parseFloat(document.getElementById('target').value || '40');
-  const tol = parseFloat(document.getElementById('tol').value || '2');
+  const minsTxt  = document.getElementById('mins').value.trim();
+  const empsTxt  = document.getElementById('emps').value.trim();
+  const target   = parseFloat(document.getElementById('target').value || '40');
+  const tol      = parseFloat(document.getElementById('tol').value || '2');
 
-  const slots = slotsTxt.split(/\n+/).map(line => {
-    const [s,e] = line.split('-').map(t => t.trim());
+  // Slots base (para un día)
+  const slots = slotsTxt.split(/\n+/).map(line=>{
+    const [s,e] = line.split('-').map(t=>t.trim());
     return {start:s, end:e};
   });
-  const mins = minsTxt.split(',').map(x => parseInt(x.trim(),10));
-  const emps = empsTxt.split(',').map(id => ({id:id.trim(), target_hours: target}));
+
+  const mins = minsTxt.split(',').map(x=>parseInt(x.trim(),10));
+  if (mins.length !== slots.length){
+    alert("Los mínimos deben tener el mismo número de elementos que los slots.");
+    throw new Error("mins != slots length");
+  }
+
+  const emps = empsTxt.split(',').map(id=>({id:id.trim(), target_hours: target}));
   return {slots, mins, emps, target, tol};
 }
 
-document.getElementById('run').onclick = async () => {
-  const {slots, mins, emps, tol} = parseBasicInputs();
-  const payload = { slots, min_per_slot: mins, employees: emps, tolerance: tol };
-  const res = await fetch('/solve/greedy', {
-    method:'POST', headers:{'Content-Type':'application/json'},
-    body: JSON.stringify(payload)
-  });
-  const data = await res.json();
-  document.getElementById('out').textContent = JSON.stringify(data, null, 2);
-};
+function minutes(t){
+  let [h,m] = t.split(":").map(Number);
+  if (h===24 && m===0) return 24*60-1; // 23:59 como en el backend
+  return h*60+m;
+}
+function hoursBetween(a,b){
+  return Math.max(0,(minutes(b)-minutes(a)))/60.0;
+}
 
-document.getElementById('runV2').onclick = async () => {
-  const {slots, mins, emps, target, tol} = parseBasicInputs();
-  const day = document.getElementById('day').value.trim() || 'Mon';
-  const maxDay = parseFloat(document.getElementById('maxDay').value || '10');
-  const maxBlocks = parseInt(document.getElementById('maxBlocks').value || '2', 10);
-  const availStart = document.getElementById('availStart').value.trim() || '11:00';
-  const availEnd = document.getElementById('availEnd').value.trim() || '23:59';
-
-  // Adaptar slots con día
-  const slotsV2 = slots.map(s => ({ day, start: s.start, end: s.end }));
-
-  // Disponibilidad global (mismo rango para todos en 'day')
-  const employeesV2 = emps.map(e => ({
+function buildWeekSlots(slotsBase){
+  // duplica los slots de un día para toda la semana con nombres Mon..Sun
+  const out = [];
+  for (const day of DAYS_EN){
+    for (const s of slotsBase){
+      out.push({day, start:s.start, end:s.end});
+    }
+  }
+  return out;
+}
+function repeatMinsForWeek(minsBase){
+  const out = [];
+  for (let i=0;i<DAYS_EN.length;i++) out.push(...minsBase);
+  return out;
+}
+function buildEmployeesV2(emps, target, maxDay, maxBlocks, availStart, availEnd){
+  return emps.map(e=>({
     id: e.id,
     target_hours: target,
     max_hours_per_day: maxDay,
     max_blocks_per_day: maxBlocks,
-    availability: { [day]: [{ start: availStart, end: availEnd }] }
+    availability: Object.fromEntries(DAYS_EN.map(d=>[d, [{start:availStart, end:availEnd}]]))
   }));
+}
 
-  const payload = { slots: slotsV2, min_per_slot: mins, employees: employeesV2, tolerance: tol };
+function renderMatrix(emps, days, slotsV2, assignments){
+  // matriz [emp][day] acumulando horas
+  const mapIdx = Object.fromEntries(emps.map((e,i)=>[e.id,i]));
+  const hrs = Array.from({length: emps.length}, ()=>Object.fromEntries(days.map(d=>[d,0])));
+  const total = new Array(emps.length).fill(0);
 
-  const res = await fetch('/solve/greedy_v2', {
-    method:'POST', headers:{'Content-Type':'application/json'},
-    body: JSON.stringify(payload)
-  });
-  const data = await res.json();
-  document.getElementById('out').textContent = JSON.stringify(data, null, 2);
+  for (let i=0;i<assignments.length;i++){
+    const slot = slotsV2[i];
+    const dur = hoursBetween(slot.start, slot.end);
+    for (const empId of assignments[i]){
+      const r = mapIdx[empId];
+      if (r===undefined) continue;
+      hrs[r][slot.day] += dur;
+      total[r] += dur;
+    }
+  }
+
+  // HTML tabla
+  let html = '<table><thead><tr><th>Empleado</th>';
+  for (let c=0;c<days.length;c++) html += `<th>${DAYS_ES[c]}</th>`;
+  html += '<th>Total</th></tr></thead><tbody>';
+
+  for (let r=0;r<emps.length;r++){
+    html += `<tr><td class="emp">${emps[r].id}</td>`;
+    for (let c=0;c<days.length;c++){
+      const v = hrs[r][days[c]];
+      const txt = v>0 ? v.toFixed(1) : '';
+      const cls = v>0 ? ' class="hit"' : '';
+      html += `<td${cls}>${txt}</td>`;
+    }
+    html += `<td><b>${total[r].toFixed(1)}</b></td></tr>`;
+  }
+  html += '</tbody></table>';
+  document.getElementById('tableWrap').innerHTML = html;
+}
+
+document.getElementById('runWeek').onclick = async () => {
+  try{
+    const {slots, mins, emps, target, tol} = parseBasicInputs();
+    const maxDay    = parseFloat(document.getElementById('maxDay').value || '10');
+    const maxBlocks = parseInt(document.getElementById('maxBlocks').value || '2',10);
+    const availStart= document.getElementById('availStart').value.trim() || '11:00';
+    const availEnd  = document.getElementById('availEnd').value.trim() || '23:59';
+
+    const slotsV2 = buildWeekSlots(slots);
+    const minsW   = repeatMinsForWeek(mins);
+    const employeesV2 = buildEmployeesV2(emps, target, maxDay, maxBlocks, availStart, availEnd);
+
+    const payload = { slots: slotsV2, min_per_slot: minsW, employees: employeesV2, tolerance: tol };
+    const res = await fetch('/solve/greedy_v2', {
+      method:'POST', headers:{'Content-Type':'application/json'},
+      body: JSON.stringify(payload)
+    });
+    const data = await res.json();
+
+    // Render tabla y avisos
+    renderMatrix(emps, DAYS_EN, slotsV2, data.assignments || []);
+    const warnBox = document.getElementById('warnings');
+    if (data.warnings && data.warnings.length){
+      warnBox.style.display = '';
+      warnBox.textContent = data.warnings.join('\n');
+    } else {
+      warnBox.style.display = 'none';
+      warnBox.textContent = '';
+    }
+  }catch(err){
+    alert('Revisa los datos de entrada (slots y mínimos deben coincidir).');
+    console.error(err);
+  }
 };
 </script>
 </body>
