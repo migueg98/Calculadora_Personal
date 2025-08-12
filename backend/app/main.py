@@ -2,7 +2,7 @@ from fastapi import FastAPI, HTTPException
 from pydantic import BaseModel
 from typing import List, Dict
 from datetime import time
-from .solver import greedy_assign
+from app.solver import greedy_assign
 
 app = FastAPI(title="Cuadrantes Hostelería", version="0.1.0")
 
