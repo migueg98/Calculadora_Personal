@@ -1,0 +1,22 @@
+# Python
+__pycache__/
+*.pyc
+.venv/
+env/
+venv/
+*.egg-info/
+
+# Node
+node_modules/
+.next/
+dist/
+build/
+npm-debug.log*
+.yarn/
+.pnpm-store/
+
+# OS/IDE
+.DS_Store
+Thumbs.db
+.vscode/
+.idea/
